@@ -1,0 +1,173 @@
+#!/bin/lua9
+
+local pt = g.pt
+local ZP = g.ZP
+
+-- constants
+local NCOL <const> = 26			-- number of columns
+local COLWIDTH <const> = 58		-- default column width
+local HDRCOLWIDTH <const> = 12	-- header column width
+local ROWHEIGHT <const> = 12		-- row height
+local HDRROWHEIGHT <const> = 12	-- header row height
+local GRIDFG <const> = 0xBBBBBBFF	-- grid foreground
+local HDRBG <const> = 0xEEEEEEFF	-- header background
+
+local crosscursor = {
+	offset = { x = -7, y = -7},
+	clr = {0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0,
+	 0x03, 0xC0, 0x03, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF,
+	 0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0xC0, 0x03, 0xC0,
+	 0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0, 0x03, 0xC0, },
+	set = {0x00, 0x00, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80,
+	 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x7F, 0xFE,
+	 0x7F, 0xFE, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80,
+	 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x00, 0x00, }
+}
+
+-- global variables
+local gridfg
+local hdrbg
+local table = {}	-- data in two-dimensional array: table[col][row] = value
+local colwidth = {}	-- column widths indexed by column number
+
+-- return column name for nth column
+function colname(n)
+	if n < 1 then 
+		return nil
+	elseif n < 27 then
+		return string.char(string.byte("A") - 1 + n)
+	else
+		return nil -- not implemented yet
+	end
+end
+
+-- initialize column widths based on table data
+function initcolwidths()
+	for i = 1, NCOL do
+		colwidth[i] = COLWIDTH
+	end
+	for column, rows in ipairs(table) do
+		for row, value in ipairs(rows) do
+			w = draw.stringsize(font, value).x + 2
+			if w > colwidth[column] then
+				colwidth[column] = w
+			end
+		end
+	end
+end
+
+function eresized()
+	draw.draw(screen, screen.r, display.white, nil, ZP)
+	-- draw headers
+	draw.fillpoly(screen, { screen.r.min,
+				g.pt(screen.r.max.x, screen.r.min.y),
+				g.pt(screen.r.max.x, screen.r.min.y+HDRROWHEIGHT),
+				g.pt(screen.r.min.x, screen.r.min.y+HDRROWHEIGHT),
+				screen.r.min }, 0, hdrbg, ZP)
+	draw.fillpoly(screen, { screen.r.min,
+				g.pt(screen.r.min.x+HDRCOLWIDTH, screen.r.min.y),
+				g.pt(screen.r.min.x+HDRCOLWIDTH, screen.r.max.y),
+				g.pt(screen.r.min.x, screen.r.max.y),
+				screen.r.min }, 0, hdrbg, ZP)
+	-- draw grid
+	x = screen.r.min.x + HDRCOLWIDTH
+	i = 1
+	while x < screen.r.max.x do
+		draw.line(screen, pt(x, screen.r.min.y), pt(x, screen.r.max.y), 
+				draw.END_SQUARE, draw.END_SQUARE, 0, gridfg, ZP)
+		x = x + colwidth[i]
+		i = i + 1
+	end
+	y = screen.r.min.y + HDRROWHEIGHT
+	while y < screen.r.max.y do
+		draw.line(screen, pt(screen.r.min.x, y), pt(screen.r.max.x, y), 
+				draw.END_SQUARE, draw.END_SQUARE, 0, gridfg, ZP)
+		y = y + ROWHEIGHT
+	end
+	-- draw header column labels
+	x = screen.r.min.x + HDRCOLWIDTH
+	i = 1
+	while x < screen.r.max.x do
+		half = math.floor(colwidth[i]/2)
+		draw.string(screen, pt(x + half - math.floor(draw.stringsize(font, 
+			colname(i)).x/2), screen.r.min.y), display.black, ZP, font, colname(i))
+		x = x + colwidth[i]
+		i = i + 1
+	end
+	-- draw header row labels
+	y = screen.r.min.y + HDRROWHEIGHT
+	i = 1
+	half = math.floor(HDRCOLWIDTH/2)
+	while y < screen.r.max.y do
+		draw.string(screen, pt(screen.r.min.x + half - 
+			math.floor(draw.stringsize(font, tostring(i)).x/2), y), display.black,
+			ZP, font, tostring(i))
+		y = y + ROWHEIGHT
+		i = i + 1
+	end
+	-- draw table data
+	left = screen.r.min.x + HDRCOLWIDTH
+	for column, rows in ipairs(table) do
+		for row, value in ipairs(rows) do
+			-- left justified
+			x = left + 2
+			-- right justified
+			x = left + colwidth[column] - draw.stringsize(font, value).x
+			y = screen.r.min.y + HDRROWHEIGHT + (row-1)*ROWHEIGHT
+			draw.string(screen, pt(x, y), display.black, ZP, font, value)
+		end
+		left = left + colwidth[column]
+	end 	
+end
+
+-- populate table from filename
+function get(filename)
+	-- clear table
+	for k in pairs(table) do
+		table[k] = nil
+	end
+	-- initialize table
+	for i = 1, NCOL do
+		table[i] = {}
+	end
+	-- read tab separated values
+	row = 1
+	for line in io.lines(filename) do
+		line = line:gsub("\r", "")
+		col = 1
+		for value in string.gmatch(line, "([^\t]*)") do
+			table[col][row] = value
+			col = col + 1
+		end
+		row = row + 1
+	end
+end
+
+if not arg[1] then
+	io.stderr:write("usage: xl <file>\n")
+	os.exit("usage")
+end
+get(arg[1])
+draw.init(arg[1])
+initcolwidths()
+gridfg = draw.allocimage(display, g.rect(0,0,1,1), screen.chan, 1, GRIDFG)
+hdrbg = draw.allocimage(display, g.rect(0,0,1,1), screen.chan, 1, HDRBG)
+event.init(event.MOUSE|event.KEYBOARD)
+eresized()
+while true do
+	local e, ev = event.event()
+	if e == event.KEYBOARD then
+		if ev.kbdc == key.DEL then
+			os.exit()
+		end
+	end
+	-- if e == event.MOUSE then
+	--	-- if mouse hovers over column header border, change the cursor
+	--	if (ev.mouse.xy.y > screen.r.min.y) and
+	--		(ev.mouse.xy.y <= screen.r.min.y + HDRROWHEIGHT) then
+	--		draw.setcursor(crosscursor)
+	--	else
+	--		draw.setcursor(nil)
+	--	end
+	-- end
+end
