@@ -13,6 +13,6 @@ xl is written in Lua and requires [lua9](https://github.com/telephil9/lua9).
 
 The VGA font which is the default on 9front does not look great. You will get a nicer looking sheet using Tahoma or Lucida Sans:
 
-`font=/usr/k/lib/font/bit/tahoma/unicode.11.font xl sheet`
+`% font=/usr/k/lib/font/bit/tahoma/unicode.11.font xl sheet`
 
-`font=/lib/font/bit/lucidasans/unicode.7.font xl sheet`
+`% font=/lib/font/bit/lucidasans/unicode.7.font xl sheet`
