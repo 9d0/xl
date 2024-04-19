@@ -5,6 +5,9 @@ If you have Excel you can save your spreadsheet as a .tsv file which xl can read
 
 If necessary, convert the character set to UTF-8 using `tcs`.
 
+## Screenshot
+![screenshot.png](screenshot.png)
+
 ## Installation
 xl is written in Lua and requires [lua9](https://github.com/telephil9/lua9).
 
