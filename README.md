@@ -1,5 +1,5 @@
 # xl
-xl imitates Microsoft Excel without shame. Currently it can only view very simple spreadsheets that are saved as tab-separated values. 
+xl imitates Microsoft Excel without shame but falls three letters short. Currently xl can only view very simple spreadsheets that are saved as tab-separated values. 
 
 If you have Excel you can save your spreadsheet as a .tsv file which xl can read. If you don't have Excel you can use `xls2txt` on Plan 9 to extract tab-separated values from an .xls file.
 
