@@ -29,6 +29,7 @@ local colwidth = {}	-- column widths indexed by column number
 local hdrcolwidth
 local rowheight
 local hdrrowheight
+local selection		-- coordinate of the selected cell, e.g. "C2"
 
 -- return column name for nth column
 function colname(n)
@@ -39,6 +40,26 @@ function colname(n)
 	else
 		return nil -- not implemented yet
 	end
+end
+
+-- return column number for cell
+function cellcolumn(cell)
+	return (string.byte(string.sub(cell, 1, 1)) - string.byte("A") + 1)
+end
+
+-- return row number for cell
+function cellrow(cell)
+	return tonumber(string.sub(cell, 2))
+end
+
+-- return the top left point of cell
+function celltopleft(cell)
+	x = screen.r.min.x + hdrcolwidth
+	for i = 1, cellcolumn(cell) - 1 do
+		x = x + colwidth[i]
+	end
+	y = screen.r.min.y + hdrrowheight + (cellrow(cell)-1)*rowheight
+	return g.pt(x,y)
 end
 
 -- initialize column widths based on table data
@@ -61,6 +82,40 @@ function initwidthsandheights()
 	hdrrowheight = rowheight
 end
 
+-- returns the cell Point p is in
+function ptincell(p)
+	if p.x < screen.r.min.x or p.x > screen.r.max.x then
+		return nil
+	end
+	if p.y < screen.r.min.y or p.x > screen.r.max.y then
+		return nil
+	end
+	if p.x < screen.r.min.x+hdrcolwidth then
+		-- p is in the header column
+		return nil
+	end
+	if p.y < screen.r.min.y+hdrrowheight then
+		-- p is in the header row
+		return nil
+	end
+	-- p is in the grid
+	-- find column
+	x = screen.r.min.x + hdrcolwidth
+	column = 1
+	while x < p.x do
+		x = x + colwidth[column]
+		column = column+ 1
+	end
+	-- find row
+	y = screen.r.min.y + hdrrowheight
+	row = 1
+	while y < p.y do
+		y = y + rowheight
+		row = row + 1
+	end
+	return colname(column-1) .. tostring(row-1)
+end
+	
 function eresized()
 	draw.draw(screen, screen.r, display.white, nil, ZP)
 	-- draw headers
@@ -116,7 +171,29 @@ function eresized()
 			draw.string(screen, pt(x, y), display.black, ZP, font, value)
 		end
 		left = left + colwidth[column]
-	end 	
+	end
+	-- draw selection
+	if selection then
+		-- draw a thick rectangle around selection
+		topleft = celltopleft(selection)
+		topright = g.pt(topleft.x+colwidth[cellcolumn(selection)], topleft.y)
+		btmleft = g.pt(topleft.x, topleft.y+rowheight)
+		btmright = g.pt(topright.x, btmleft.y)
+		draw.poly(screen, { topleft, topright, btmright, btmleft, topleft },
+			draw.END_SQUARE, draw.END_SQUARE, 0, display.black, ZP)
+		draw.poly(screen, { 	g.pt(topleft.x-1, topleft.y-1),
+							g.pt(topright.x+1, topright.y-1),
+							g.pt(btmright.x+1, btmright.y+1),
+							g.pt(btmleft.x-1, btmleft.y+1),
+							g.pt(topleft.x-1, topleft.y-1) },
+			draw.END_SQUARE, draw.END_SQUARE, 0, display.black, ZP)
+		-- draw the name of the selected cell into upper left corner of the grid
+		-- draw.draw(screen, g.rect(screen.r.min.x, screen.r.min.y,
+		-- 	screen.r.min.x+hdrcolwidth, screen.r.min.y+hdrrowheight), 
+		-- 	hdrbg, nil, ZP)
+		-- draw.string(screen, g.pt(screen.r.min.x+2,screen.r.min.y), 
+		--	display.black, ZP, font, selection)
+	end
 end
 
 -- populate table from filename
@@ -160,13 +237,12 @@ while true do
 			os.exit()
 		end
 	end
-	-- if e == event.MOUSE then
-	--	-- if mouse hovers over column header border, change the cursor
-	--	if (ev.mouse.xy.y > screen.r.min.y) and
-	--		(ev.mouse.xy.y <= screen.r.min.y + hdrrowheight) then
-	--		draw.setcursor(crosscursor)
-	--	else
-	--		draw.setcursor(nil)
-	--	end
-	-- end
+	if e == event.MOUSE then
+		if ev.mouse.buttons == 1 then
+			selection = ptincell(ev.mouse.xy)
+			if selection then
+				eresized()
+			end
+		end
+	end
 end
